@@ -74,6 +74,10 @@ class Concrete02 : public UniaxialMaterial
     void Print(OPS_Stream &s, int flag =0);
 
     int getVariable(const char *variable, Information &);
+
+    Response* setResponse(const char** argv, int argc, OPS_Stream& theOutputStream); // for FSAM
+    int getResponse(int responseID, Information& matInformation);  // for FSAM
+    Vector getInputParameters(void); // for FSAM
     
     double getEnergy() { return TEnergy; }
 

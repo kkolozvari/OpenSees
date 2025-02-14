@@ -32,7 +32,7 @@
 //
 // Source: /usr/local/cvs/OpenSees/SRC/material/nD/reinforcedConcretePlaneStress/FSAM.h
 //
-// Rev: 1
+// Rev: 2
 
 
 #include "FSAM.h"
@@ -60,7 +60,7 @@
 #endif
 
 #include "ConcreteCM.h" // for creating ConcreteCM inside the panel element
-
+#include "Concrete02.h" // for creating Concrete02 inside the panel element
 
 static int numFSAMMaterials = 0;
 
@@ -237,6 +237,8 @@ FSAM::FSAM (int tag,
 
 	TeTaSt = 0.0; // Direction of horizontal reinforcement (fixed for now)
 
+	crackBcriteria = 0;
+
 	// Material parameters
 	E0x = 0.0;
 	E0y = 0.0;
@@ -365,6 +367,22 @@ FSAM::FSAM (int tag,
 		exit(-1);
 	}
 
+	// Get the copy for Concrete 1.1
+	theMaterial[2] = c1->getCopy();
+	// Check allocation    
+	if (theMaterial[2] == 0) {
+		opserr << " FSAM::FSAM - failed to get a copy for Concrete A1\n";
+		exit(-1);
+	}
+
+	// Get the copy for Concrete 1.2
+	theMaterial[3] = c2->getCopy();
+	// Check allocation    
+	if (theMaterial[3] == 0) {
+		opserr << " FSAM::FSAM - failed to get a copy for Concrete A1\n";
+		exit(-1);
+	}
+
 	// Get the copy for Concrete A1
 	theMaterial[4] = cA1->getCopy();	
 	// Check allocation    
@@ -398,83 +416,130 @@ FSAM::FSAM (int tag,
 	}
 
 	// get/set responses
-	theResponses = new Response *[2];  
+	theResponses = new Response *[2];  // 0 = concrete input parameters, 1 = cyclic cracking strain in Concrete02
 	if ( theResponses == 0) {
 		opserr << " FSAM::FSAM - failed allocate responses array\n";
 		exit(-1);
 	}
 
-	//OPS_Stream *theDummyStream = new DummyStream();
 	DummyStream theDummyStream;
-	//const char **argv = new const char *[1];
-	//argv[0] = "getCommittedCyclicCrackingConcreteStrain"; // to get committed concrete cyclic cracking strain from strut A2
-	char aa[80] = "getCommittedCyclicCrackingConcreteStrain";
-	const char *argv[1];
+	const char* argv[1];
+
+	// Get concrete material input variables
+	char aa[80] = "getInputParameters"; // to get input parameters from concrete material
 	argv[0] = aa;
-	theResponses[0] = theMaterial[5]->setResponse(argv, 1, theDummyStream);
+	
+	theResponses[0] = theMaterial[4]->setResponse(argv, 1, theDummyStream);
 
 	if (theResponses[0] == 0) {
-			opserr << " FSAM::FSAM - failed to get cracking strain for material with tag: " << tag << "\n";
-			exit(-1);
-	}
-
-	//argv[0] = "getInputParameters"; // to get input parameters from ConcreteCM
-	char bb[80] = "getInputParameters";
-	argv[0] = bb;
-	
-	theResponses[1] = theMaterial[4]->setResponse(argv, 1, theDummyStream);
-
-	if (theResponses[1] == 0) {
 			opserr << " FSAM::FSAM - failed to get input parameters for material with tag: " << tag << "\n";
 			exit(-1);
 	}
 
-	//delete theDummyStream;
-
-	// Get ConcreteCM material input variables
-	theResponses[1]->getResponse();
-	Information &theInfoInput = theResponses[1]->getInformation();
+	theResponses[0]->getResponse();
+	Information &theInfoInput = theResponses[0]->getInformation();
 	const Vector &ConcreteInput = theInfoInput.getData();
 
 	// Now create monotonic concrete materials for uncracked stage of behavior
-	// Concrete 1.1
-	// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic ConcreteCM	
-	theMaterial[2] = new ConcreteCM(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
-		ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7], ConcreteInput[8], ConcreteInput[9], 1); // create monotonic concrete
+	if (strcmp(cA1->getClassType(), "ConcreteCM") == 0) {
 
-	// Check allocation    
-	if ( theMaterial[2] == 0 ) {
-		opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
-		exit(-1);
+		char bb[80] = "getCommittedCyclicCrackingConcreteStrain"; // to get committed concrete cyclic cracking strain from strut A2
+		argv[0] = bb;
+		theResponses[1] = theMaterial[5]->setResponse(argv, 1, theDummyStream);
+
+		if (theResponses[1] == 0) {
+			opserr << " FSAM::FSAM - failed to get cracking strain for material with tag: " << tag << "\n";
+			exit(-1);
+		}
+
+		// Concrete 1.1
+		// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic ConcreteCM	
+		theMaterial[2] = new ConcreteCM(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7], ConcreteInput[8], ConcreteInput[9], 1); // create monotonic concrete
+
+		// Check allocation
+		if (theMaterial[2] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
+			exit(-1);
+		}
+
+		// Concrete 1.2
+		//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic ConcreteCM	
+		theMaterial[3] = new ConcreteCM(-2222, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7], ConcreteInput[8], ConcreteInput[9], 1); // create monotonic concrete
+
+		// Check allocation    
+		if (theMaterial[3] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 2\n";
+			exit(-1);
+		}
+
+		// Obtain some material properties used later in the FSAM model
+		// Young's modulus for concrete
+		Ec = theMaterial[4]->getInitialTangent();
+
+		// Strain at peak compressive stress for concrete
+		epcc = ConcreteInput[2];
+
+		// Peak compressive stress for concrete
+		fpc = ConcreteInput[1];
+
+		// Cracking strain for concrete
+		et = ConcreteInput[7];
+
+		// CrackingCriteria = 1 - strain based (original), 2 - stress based (flexible)
+		CrackingCriteria = 1;
 	}
+	else if (strcmp(cA1->getClassType(), "Concrete02") == 0) {
 
-	// Concrete 1.2
-	//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic ConcreteCM	
-	theMaterial[3] = new ConcreteCM(-2222, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
-		ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7], ConcreteInput[8], ConcreteInput[9], 1); // create monotonic concrete
+		// Concrete 1.1
+		// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic Concrete02 !!! currently there is no monotonic flag
+		theMaterial[2] = new Concrete02(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
 
-	// Check allocation    
-	if ( theMaterial[3] == 0 ) {
-		opserr << " FSAM::FSAM - failed to get a copy for Concrete 2\n";
-		exit(-1);
+		// Check allocation
+		if (theMaterial[2] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
+			exit(-1);
+		}
+
+		// Concrete 1.2
+		//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic Concrete02	!!! currently there is no monotonic flag
+		theMaterial[3] = new Concrete02(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
+
+		// Check allocation
+		if (theMaterial[3] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
+			exit(-1);
+		}
+		
+		// Obtain some material properties used later in the FSAM model
+		// Young's modulus for concrete
+		Ec = theMaterial[4]->getInitialTangent();
+
+		// Peak compressive stress for concrete
+		fpc = ConcreteInput[1];
+
+		// Strain at peak compressive stress for concrete
+		epcc = ConcreteInput[2];
+
+		// Cracking strain for concrete
+		et = ConcreteInput[6] / Ec;
+
+		// CrackingCriteria = 1 - strain based (original), 2 - stress based (flexible)
+		CrackingCriteria = 2;
 	}
+	else {
 
-	// Obtain some material properties used later in the FSAM model
-	// Young's modulus for concrete
-	Ec = theMaterial[4] -> getInitialTangent();
+		opserr << " FSAM::FSAM - Unsupported concrete material used. Use ConcreteCM or Concrete02.\n";
+		exit(-1);
 
-	// Strain at peak compressive stress for concrete
-	epcc = ConcreteInput[2];
-	
-	// Peak compressive stress for concrete
-	fpc = ConcreteInput[1];
-
-	// Cracking strain for concrete
-	et = ConcreteInput[7];
+	}
 
 	// Young's modulus for steel
-	E0x = theMaterial[0] -> getInitialTangent(); // Horizontal reinforcement
-	E0y = theMaterial[1] -> getInitialTangent(); // Vertical reinforcement
+	E0x = theMaterial[0]->getInitialTangent(); // Horizontal reinforcement
+	E0y = theMaterial[1]->getInitialTangent(); // Vertical reinforcement
 
 	this->revertToStart();
 }
@@ -1020,7 +1085,7 @@ int FSAM::commitState(void)
 		CeA12 = TeA12;
 		Ctau_Interlock_A = Ttau_Interlock_A;
 
-		// Store committed values compressive strain in perpendicular direction (for 2nd cracking criterium)
+		// Store committed values tensile strain in perpendicular direction (for 2nd cracking criterium in when Concrete02 is used)
 		CepsA2 = TepsA2;
 
 		}
@@ -1060,13 +1125,29 @@ int FSAM::commitState(void)
 			theMaterial[i]->commitState();
 		}
 
-		// Get Committed value of cyclic cracking strain for Concrete
-		theResponses[0]->getResponse();
-		Information &theInfoA2 = theResponses[0]->getInformation();
-		double eunpA2 = theInfoA2.theDouble;
-
 		// cracking criterium for 2nd crack .....................................
-		if (CepsA2 >= eunpA2) { //eA2 from the 1st crack
+		if (CrackingCriteria == 1) { // strain based criterion for ConcreteCM material
+
+			// Get Committed value of cyclic cracking strain for Concrete
+			theResponses[1]->getResponse();
+			Information& theInfoA2 = theResponses[1]->getInformation();
+			double eunpA2 = theInfoA2.theDouble;
+
+			if (CepsA2 >= eunpA2) {
+				crackBcriteria = 1;
+			}
+
+		}
+		else { // stress based criterion for Concrete02 material 
+
+			if (TStrainStressConc2(1) >= 0.0) { // stress goes into tension along 1st strut
+				crackBcriteria = 1;
+			}
+
+		}
+
+		// Check if 2nd crack initiated
+		if (crackBcriteria == 1) {
 
 			// Initiate 2nd crack
 			crackB = 1; 

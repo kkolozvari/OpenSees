@@ -32,7 +32,7 @@
 //
 // Source: /usr/local/cvs/OpenSees/SRC/material/nD/reinforcedConcretePlaneStress/FSAM.h
 //
-// Rev: 1
+// Rev: 2
 
 
 #ifndef FSAM_h
@@ -142,6 +142,9 @@ private:
 	double   nu;					// friction Coefficient of Shear Aggregate Interlock 
 	double   alfadow;				// stiffness Coefficient of Dowel Action 
 	Vector ConcreteInput;			// vector for storing concrete input variables
+
+	int CrackingCriteria;			// 1 - strain based (original), 2 - stress based (flexible) 
+	int crackBcriteria;
 
 	// Biaxial Damage Parameters ......................
 	// Variables for getting value from betaf4 function
