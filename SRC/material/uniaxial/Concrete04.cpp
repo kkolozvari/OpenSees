@@ -44,6 +44,8 @@
 #include <float.h>
 #include <elementAPI.h>
 
+#include <MaterialResponse.h> // for FSAM
+
 void* OPS_Concrete04()
 {
     int numdata = OPS_GetNumRemainingInputArgs();
@@ -134,6 +136,8 @@ Concrete04::Concrete04
   CunloadSlope = Ec0;
   CUtenSlope = Ec0;
   
+  if (tag == -1111 || tag == -2222) mon = 1; // turn on monotonic behavior for FSAM
+
   // Set trial values
   this->revertToLastCommit();
 }
@@ -220,6 +224,17 @@ int Concrete04::setTrialStrain (double strain, double strainRate)
   Tstrain = Cstrain;   
   Tstress = Cstress;   
   Ttangent = Ctangent;
+
+  // monotonic only behavior for FSAM
+  if (mon == 1) {
+      if (strain <= 0.0) {
+          this->CompEnvelope();
+      }
+      else {
+          this->TensEnvelope();
+      }
+      return 0;
+  }
 
   /* // Set trial strain*/  
   if (fct == 0.0 && strain > 0.0) {    
@@ -562,3 +577,55 @@ Concrete04::getMaterialType()
 	return 0;
 }
 /*// LOWES: end*/
+
+// for FSAM
+Response* Concrete04::setResponse(const char** argv, int argc,
+    OPS_Stream& theOutput)
+{
+    Response* theResponse = 0;
+
+    if (strcmp(argv[0], "getInputParameters") == 0) {
+        Vector data1(8);
+        data1.Zero();
+        theResponse = new MaterialResponse(this, 100, data1);
+
+    }
+    else
+
+        return this->UniaxialMaterial::setResponse(argv, argc, theOutput);
+
+    return theResponse;
+}
+
+// for FSAM
+int Concrete04::getResponse(int responseID, Information& matInfo)
+{
+    if (responseID == 100) {
+        matInfo.setVector(this->getInputParameters());
+
+    }
+    else
+
+        return this->UniaxialMaterial::getResponse(responseID, matInfo);
+
+    return 0;
+}
+
+// for FSAM
+Vector Concrete04::getInputParameters(void)
+{
+    Vector input_par(8); // size = max number of parameters (assigned + default)
+
+    input_par.Zero();
+
+    input_par(0) = this->getTag();
+    input_par(1) = fpc;
+    input_par(2) = epsc0;
+    input_par(3) = epscu;
+    input_par(4) = Ec0;
+    input_par(5) = fct;
+    input_par(6) = etu;
+    input_par(7) = beta;
+
+    return input_par;
+}

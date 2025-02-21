@@ -111,6 +111,11 @@ Concrete02::Concrete02(int tag, double _fc, double _epsc0, double _fcu,
   eps = 0.0;
   sig = 0.0;
   e = 2.0*fc/epsc0;
+
+  if (tag == -1111 || tag == -2222) mon = 1; // turn on monotonic behavior for FSAM
+
+  opserr << "Concrete02 tag: " << this->getTag() << ", Ec: " << 2.0 * fc / epsc0 << ", fc: " << fc << ", epsc: " << epsc0 << ", fcu: " << fcu << ", epscu: " << epscu << ", ratio: " << rat << ", ft: " << ft << ", Ets: " << Ets << "\n";
+
 }
 
 Concrete02::Concrete02(int tag, double _fc, double _epsc0, double _fcu,
@@ -123,7 +128,7 @@ Concrete02::Concrete02(int tag, double _fc, double _epsc0, double _fcu,
 
   if (fc > 0) fc = -fc;
   if (epsc0 > 0) epsc0 = -epsc0;
-  if (fcu > 0) fcu = -fcu;
+  if (fcu > 0) fcu = -fcu;  
   if (epscu > 0) epscu = -epscu;
 	  
   eP = 2.0*fc/epsc0;
@@ -183,6 +188,17 @@ Concrete02::setTrialStrain(double trialStrain, double strainRate)
 
   if (fabs(deps) < DBL_EPSILON)
     return 0;
+
+  // monotonic only behavior for FSAM
+  if (mon == 1) {
+      if (eps <= 0.0) {
+          this->Compr_Envlp(eps, sig, e);
+      }
+      else {
+          this->Tens_Envlp(eps, sig, e);
+      }
+      return 0;
+  }
 
   // if the current strain is less than the smallest previous strain 
   // call the monotonic envelope in compression and reset minimum strain 

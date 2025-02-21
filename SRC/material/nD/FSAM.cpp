@@ -59,8 +59,9 @@
 #define fmax(a,b) ( ((a)>(b))?(a):(b) )
 #endif
 
-#include "ConcreteCM.h" // for creating ConcreteCM inside the panel element
-#include "Concrete02.h" // for creating Concrete02 inside the panel element
+#include "ConcreteCM.h" // for creating ConcreteCM within FSAM
+#include "Concrete02.h" // for creating Concrete01 within FSAM
+#include "Concrete04.h" // for creating Concrete02 within FSAM
 
 static int numFSAMMaterials = 0;
 
@@ -238,6 +239,7 @@ FSAM::FSAM (int tag,
 	TeTaSt = 0.0; // Direction of horizontal reinforcement (fixed for now)
 
 	crackBcriteria = 0;
+	CrackingCriteria = 0;
 
 	// Material parameters
 	E0x = 0.0;
@@ -367,6 +369,7 @@ FSAM::FSAM (int tag,
 		exit(-1);
 	}
 
+	/*
 	// Get the copy for Concrete 1.1
 	theMaterial[2] = c1->getCopy();
 	// Check allocation    
@@ -382,7 +385,7 @@ FSAM::FSAM (int tag,
 		opserr << " FSAM::FSAM - failed to get a copy for Concrete A1\n";
 		exit(-1);
 	}
-
+	*/
 	// Get the copy for Concrete A1
 	theMaterial[4] = cA1->getCopy();	
 	// Check allocation    
@@ -416,7 +419,7 @@ FSAM::FSAM (int tag,
 	}
 
 	// get/set responses
-	theResponses = new Response *[2];  // 0 = concrete input parameters, 1 = cyclic cracking strain in Concrete02
+	theResponses = new Response *[2];  // 0 = concrete input parameters, 1 = cyclic cracking strain in ConcreteCM
 	if ( theResponses == 0) {
 		opserr << " FSAM::FSAM - failed allocate responses array\n";
 		exit(-1);
@@ -490,11 +493,11 @@ FSAM::FSAM (int tag,
 		// CrackingCriteria = 1 - strain based (original), 2 - stress based (flexible)
 		CrackingCriteria = 1;
 	}
-	else if (strcmp(cA1->getClassType(), "Concrete02") == 0) {
+	else if (strcmp(cA1->getClassType(), "Concrete04") == 0) {
 
 		// Concrete 1.1
-		// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic Concrete02 !!! currently there is no monotonic flag
-		theMaterial[2] = new Concrete02(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
+		// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic Concrete01
+		theMaterial[2] = new Concrete04(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
 			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
 
 		// Check allocation
@@ -504,8 +507,8 @@ FSAM::FSAM (int tag,
 		}
 
 		// Concrete 1.2
-		//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic Concrete02	!!! currently there is no monotonic flag
-		theMaterial[3] = new Concrete02(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3], 
+		//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic Concrete01
+		theMaterial[3] = new Concrete04(-2222, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
 			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
 
 		// Check allocation
@@ -514,6 +517,46 @@ FSAM::FSAM (int tag,
 			exit(-1);
 		}
 		
+		// Obtain some material properties used later in the FSAM model
+		// Young's modulus for concrete
+		Ec = theMaterial[4]->getInitialTangent();
+
+		// Peak compressive stress for concrete
+		fpc = ConcreteInput[1];
+
+		// Strain at peak compressive stress for concrete
+		epcc = ConcreteInput[2];
+
+		// Cracking strain for concrete
+		et = ConcreteInput[6];
+
+		// CrackingCriteria = 1 - strain based (original), 2 - stress based (flexible)
+		CrackingCriteria = 2;
+	}
+	else if (strcmp(cA1->getClassType(), "Concrete02") == 0) {
+
+		// Concrete 1.1
+		// Instead of: theMaterial[2] = c1->getCopy(); we are creating monotonic Concrete02
+		theMaterial[2] = new Concrete02(-1111, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
+
+		// Check allocation
+		if (theMaterial[2] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
+			exit(-1);
+		}
+
+		// Concrete 1.2
+		//Instead of: theMaterial[3] = c2->getCopy();  we are creating monotonic Concrete02
+		theMaterial[3] = new Concrete02(-2222, ConcreteInput[1], ConcreteInput[2], ConcreteInput[3],
+			ConcreteInput[4], ConcreteInput[5], ConcreteInput[6], ConcreteInput[7]);
+
+		// Check allocation
+		if (theMaterial[3] == 0) {
+			opserr << " FSAM::FSAM - failed to get a copy for Concrete 1\n";
+			exit(-1);
+		}
+
 		// Obtain some material properties used later in the FSAM model
 		// Young's modulus for concrete
 		Ec = theMaterial[4]->getInitialTangent();

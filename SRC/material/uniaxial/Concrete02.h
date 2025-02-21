@@ -112,6 +112,8 @@ class Concrete02 : public UniaxialMaterial
 
     double TEnergy = 0.0;
     double CEnergy = 0.0;
+
+    int mon = 0; // FSAM flag for monotonic behavior
 };
 
 

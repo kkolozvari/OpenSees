@@ -76,9 +76,16 @@ class Concrete04 : public UniaxialMaterial
   int getMaterialType(void);
   // LOWES: end
   
+  Response* setResponse(const char** argv, int argc, OPS_Stream& theOutputStream); // for FSAM
+  int getResponse(int responseID, Information& matInformation);  // for FSAM
+  Vector getInputParameters(void); // for FSAM
+
  protected:
   
  private:
+
+  int mon = 0; // FSAM flag for monotonic behavior
+
   /*** Material Properties ***/
   double fpc;    // Compressive strength
   double epsc0;  // Strain at compressive strength
@@ -126,6 +133,8 @@ class Concrete04 : public UniaxialMaterial
   void TensReload(void);
   void TensEnvelope(void);
   void setTenUnload(void);
+
+
 };
 
 
